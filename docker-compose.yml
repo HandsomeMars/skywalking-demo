@@ -1,0 +1,88 @@
+version: '3.3'
+services:
+  elasticsearch:
+    image: elasticsearch:7.8.0
+    container_name: elasticsearch
+    restart: always
+    ports:
+      - 9200:9200
+    environment:
+      discovery.type: single-node
+      TZ: Asia/Shanghai
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    #volumes:
+    #   - ./elasticsearch/logs:/usr/share/elasticsearch/logs
+    #   - ./elasticsearch/data:/usr/share/elasticsearch/data
+    #   - ./elasticsearch/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+  kibana:
+    image: kibana:7.8.0
+    container_name: kibana
+    environment:
+      - SERVER_NAME=kibana
+      - ELASTICSEARCH_HOSTS= elasticsearch:9200
+      - XPACK_MONITORING_ENABLED=true
+    ports:
+      - 5601:5601
+    depends_on:
+      - elasticsearch
+    links:
+      - elasticsearch
+  oap:
+    image: apache/skywalking-oap-server:8.0.1-es7
+    container_name: oap
+    depends_on:
+      - elasticsearch
+    links:
+      - elasticsearch
+    restart: always
+    ports:
+      - 11800:11800
+      - 12800:12800
+    environment:
+      SW_STORAGE: elasticsearch7  # 指定ES版本
+      SW_STORAGE_ES_CLUSTER_NODES: elasticsearch:9200
+      TZ: Asia/Shanghai
+    # volumes:
+    #  - ./config/alarm-settings.yml:/skywalking/config/alarm-settings.yml
+  ui:
+    image: apache/skywalking-ui:8.0.1
+    container_name: ui
+    depends_on:
+      - oap
+    links:
+      - oap
+    restart: always
+    ports:
+      - 8080:8080
+    environment:
+      SW_OAP_ADDRESS: oap:12800
+      TZ: Asia/Shanghai
+  java:
+    image: zyj/java:latest
+    container_name: java_demo
+    ports:
+      - 8089:8089
+    depends_on:
+      - oap
+    links:
+      - oap
+    environment:
+      APP_ID: java-demo
+      SKYWALKING_ADDR: oap:11800
+
+  java2:
+    image: zyj/java:latest
+    container_name: java_demo2
+    ports:
+      - 8088:8088
+    depends_on:
+      - oap
+    links:
+      - oap
+    environment:
+      APP_ID: java-demo2
+      SKYWALKING_ADDR: oap:11800
